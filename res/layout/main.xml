@@ -1,14 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="horizontal"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mainframelayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     >
-
     
-<android.opengl.GLSurfaceView android:id="@+id/overlay_gl_view"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent" />
+	<android.opengl.GLSurfaceView android:id="@+id/overlay_gl_view"
+	    android:layout_width="match_parent"
+	    android:layout_height="match_parent" />
+    
+    <RelativeLayout
+        android:id="@+id/overlay_buttons"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" >
 
-</LinearLayout>
+        <Button android:id="@+id/btn_showMap"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentLeft="true"
+            
+            android:text="Show map"
+            android:onClick="onShowMap"
+            />
+    </RelativeLayout>
+    
+    <RelativeLayout
+        android:id="@+id/overlay_buttons_2d"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" >
+
+        <Button android:id="@+id/btn_returnToMain"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            
+            android:layout_alignParentTop="true"
+            android:layout_alignParentLeft="true"
+            
+            android:text="Back to main view"
+            android:onClick="onReturnToMain"
+            />
+    </RelativeLayout>
+
+</FrameLayout>
 

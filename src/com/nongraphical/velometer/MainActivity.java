@@ -31,12 +31,14 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 
 public class MainActivity extends MapActivity
 {
 	private GLSurfaceView mGLView;
 	private VelometerRenderer mRenderer;
 	private MapView mMapView;
+	private MapsforgeGL mMapGL;
 	private int mCurrSpeed, mCurrRPM;
 	
 	public MainActivity() {
@@ -49,46 +51,46 @@ public class MainActivity extends MapActivity
     public void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
-        //setContentView(R.layout.main);
         
         // Fullscreen
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-        		WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        /*getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+        		WindowManager.LayoutParams.FLAG_FULLSCREEN);*/
         
-        // Periodically update
-        startUpdating();
-        
-        // Initialize OpenGL
-        mGLView = new GLSurfaceView(this);
-        mGLView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
-        mGLView.getHolder().setFormat(PixelFormat.RGBA_8888);
-        
-        mRenderer = new VelometerRenderer(this);
-        mGLView.setRenderer(mRenderer);
-        mGLView.setZOrderOnTop(true);
-        //mGLView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
-        
-        //setContentView(mGLView);
+
+        setContentView(R.layout.main);
         
         // Initialize MapView
         mMapView = new MapView(this);
-        mMapView.setClickable(false);
-        mMapView.setBuiltInZoomControls(false);
+        mMapView.setClickable(true);
+        mMapView.setBuiltInZoomControls(true);
+        mMapView.getMapScaleBar().setShowMapScaleBar(true);
+        
         File sdcardDir = Environment.getExternalStorageDirectory();
         mMapView.setMapFile(new File(sdcardDir.getPath() + "/california.map"));
         
         mMapView.getMapViewPosition().setCenter(new GeoPoint(37.7825, -122.408));
         mMapView.getMapViewPosition().setZoomLevel((byte)17);
-        //addContentView(mMapView,
-        //		new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        FrameLayout frame = (FrameLayout)findViewById(R.id.mainframelayout);
+        frame.addView(mMapView, 0);
+        mMapView.setVisibility(View.INVISIBLE);
+    	findViewById(R.id.overlay_buttons_2d).setVisibility(View.INVISIBLE);
+
         
-        setContentView(mMapView);
-        //mMapView.addView(mGLView,
-        //		new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        addContentView(mGLView,
-        		new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // Initialize OpenGL
+        mMapGL = new MapsforgeGL(mMapView);
         
+        mGLView = (GLSurfaceView)findViewById(R.id.overlay_gl_view);
+        mGLView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
+        mGLView.getHolder().setFormat(PixelFormat.RGBA_8888);
+        
+        mRenderer = new VelometerRenderer(this, mMapGL);
+        mGLView.setRenderer(mRenderer);
+        
+        
+        // Periodically update
+        startUpdating();
     }
     
     @Override
@@ -101,6 +103,24 @@ public class MainActivity extends MapActivity
     protected void onResume() {
     	super.onResume();
     	mGLView.onResume();
+    }
+    
+    
+    public void onShowMap(View view) {
+    	mGLView.setVisibility(View.INVISIBLE);
+    	findViewById(R.id.overlay_buttons).setVisibility(View.INVISIBLE);
+    	mGLView.onPause();
+    	
+    	mMapView.setVisibility(View.VISIBLE);
+    	findViewById(R.id.overlay_buttons_2d).setVisibility(View.VISIBLE);
+    }
+    public void onReturnToMain(View view) {
+    	mGLView.setVisibility(View.VISIBLE);
+    	findViewById(R.id.overlay_buttons).setVisibility(View.VISIBLE);
+    	mGLView.onResume();
+    	
+    	mMapView.setVisibility(View.INVISIBLE);
+    	findViewById(R.id.overlay_buttons_2d).setVisibility(View.INVISIBLE);
     }
     
     
@@ -166,14 +186,16 @@ class VelometerRenderer implements GLSurfaceView.Renderer
 {
 	private Drawing d;
 	private MainActivity mContext;
+	private MapsforgeGL mMapGL;
 	private int mGradTexture;
 	private float mWidth;
 	
 	private final MeterRenderer mMeterRnd;
 	
-	public VelometerRenderer(MainActivity c) {
+	public VelometerRenderer(MainActivity c, MapsforgeGL mapgl) {
 		d = new Drawing();
 		mContext = c;
+		mMapGL = mapgl;
 		mMeterRnd = new MeterRenderer(c, d);
 	}
 	
@@ -183,7 +205,10 @@ class VelometerRenderer implements GLSurfaceView.Renderer
 		gl.glMatrixMode(GL10.GL_MODELVIEW);
 		gl.glLoadIdentity();
 		
-		// TODO: draw map
+		// Draw map
+		mMapGL.render(gl, (int)(100 * mWidth), 100);
+		d.resetMatrices(gl);
+		
 		// TODO: draw mirror
 		
 		// Draw sidebars
@@ -229,6 +254,8 @@ class VelometerRenderer implements GLSurfaceView.Renderer
 		gl.glBindTexture(GL10.GL_TEXTURE_2D, mGradTexture);
 		gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_MAG_FILTER, GL10.GL_LINEAR);
 		gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_MIN_FILTER, GL10.GL_LINEAR);
+		gl.glTexParameterx(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_WRAP_S, GL10.GL_CLAMP_TO_EDGE);
+		gl.glTexParameterx(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_WRAP_T, GL10.GL_CLAMP_TO_EDGE);
 		
 		Bitmap bitmap = BitmapFactory.decodeResource(mContext.getResources(), R.drawable.black_grad);
 		GLUtils.texImage2D(GL10.GL_TEXTURE_2D, 0, bitmap, 0);
@@ -236,6 +263,7 @@ class VelometerRenderer implements GLSurfaceView.Renderer
 		
 		// Load other renderers
 		mMeterRnd.load(gl);
+		mMapGL.init(gl);
 	}
 	
 	public float getWidth() {

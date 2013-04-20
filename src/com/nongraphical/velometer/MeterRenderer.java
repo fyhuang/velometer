@@ -92,7 +92,7 @@ public class MeterRenderer {
 	
 	public void drawKphMeter(GL10 gl, int value, int maxValue) {
 		final float METER_SCALE = 0.15f,
-				CENTER_X = 0.2f, CENTER_Y = 0.55f,
+				CENTER_X = 0.2f, CENTER_Y = 0.45f,
 				TEXT_SCALE = 0.1f;
 		gl.glEnableClientState(GL10.GL_VERTEX_ARRAY);
 		gl.glDisableClientState(GL10.GL_TEXTURE_COORD_ARRAY);
@@ -132,7 +132,7 @@ public class MeterRenderer {
 	public void drawRpmMeter(GL10 gl, int value, int targetValue) {
 		final float METER_SCALE = 0.15f,
 				CENTER_X = mContext.getRenderer().getWidth() - 0.2f,
-				CENTER_Y = 0.55f, TEXT_SCALE = 0.1f;
+				CENTER_Y = 0.45f, TEXT_SCALE = 0.1f;
 		gl.glEnableClientState(GL10.GL_VERTEX_ARRAY);
 		gl.glDisableClientState(GL10.GL_TEXTURE_COORD_ARRAY);
 		gl.glDisable(GL10.GL_TEXTURE_2D);
