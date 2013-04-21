@@ -8,6 +8,7 @@ import javax.microedition.khronos.opengles.GL10;
 
 public class Drawing {
 	private final FloatBuffer mRectVertices;
+	private final FloatBuffer mTileVertices;
 	private final FloatBuffer mRectTexCoords;
 	
 	public Drawing() {
@@ -18,6 +19,14 @@ public class Drawing {
 				0.0f, 1.0f, 0.0f,
 				1.0f, 0.0f, 0.0f,
 				1.0f, 1.0f, 0.0f
+		};
+		
+		final float[] tileVerticesData = {
+				// X, Y, Z
+				0.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 1.0f,
+				1.0f, 0.0f, 0.0f,
+				1.0f, 0.0f, 1.0f
 		};
 		
 		final float[] rectTexCoordsData = {
@@ -33,6 +42,10 @@ public class Drawing {
 		mRectVertices = ByteBuffer.allocateDirect(rectVerticesData.length * FLOAT_BYTES)
 				.order(ByteOrder.nativeOrder()).asFloatBuffer();
 		mRectVertices.put(rectVerticesData).position(0);
+		
+		mTileVertices = ByteBuffer.allocateDirect(tileVerticesData.length * FLOAT_BYTES)
+				.order(ByteOrder.nativeOrder()).asFloatBuffer();
+		mTileVertices.put(tileVerticesData).position(0);
 		
 		mRectTexCoords = ByteBuffer.allocateDirect(rectTexCoordsData.length * FLOAT_BYTES)
 				.order(ByteOrder.nativeOrder()).asFloatBuffer();
@@ -61,6 +74,16 @@ public class Drawing {
 	
 	public void drawRect(GL10 gl, float x, float y, float w, float h) {
 		drawRect(gl, x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f);
+	}
+	
+	public void drawTile(GL10 gl) {
+		// Draw a flat XZ rect, don't modify matrices
+		gl.glEnableClientState(GL10.GL_VERTEX_ARRAY);
+		gl.glEnableClientState(GL10.GL_TEXTURE_COORD_ARRAY);
+		gl.glVertexPointer(3, GL10.GL_FLOAT, 0, mTileVertices);
+		gl.glTexCoordPointer(2, GL10.GL_FLOAT, 0, mRectTexCoords);
+		
+		gl.glDrawArrays(GL10.GL_TRIANGLE_STRIP, 0, 4);
 	}
 	
 	public void resetMatrices(GL10 gl) {

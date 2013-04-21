@@ -1,6 +1,7 @@
 package com.nongraphical.velometer;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import javax.microedition.khronos.opengles.GL10;
 
@@ -12,14 +13,16 @@ import org.mapsforge.core.model.Tile;
 import org.mapsforge.core.util.MercatorProjection;
 
 import android.graphics.Bitmap;
+import android.opengl.GLU;
 import android.opengl.GLUtils;
 import android.util.Log;
 
 public class MapsforgeGL {
 	Drawing d;
-	int mTexture;
+	TileTextureCache mTextureCache;
 	// Rotation of view
 	float mHeading;
+	final float MAP_SCALE = 1.0f / 256.0f;
 	
 	// Imported from MapView
 	MapView mMV;
@@ -28,6 +31,7 @@ public class MapsforgeGL {
 	
 	public MapsforgeGL(MapView mv) {
 		d = new Drawing();
+		mTextureCache = new TileTextureCache(64);
 		mHeading = 0.0f;
 		
 		if (mv == null) {
@@ -40,13 +44,20 @@ public class MapsforgeGL {
 	}
 	
 	public void init(GL10 gl) {
-		int[] _textures = new int[1];
-		gl.glGenTextures(1, _textures, 0);
-		mTexture = _textures[0];
-
-		gl.glBindTexture(GL10.GL_TEXTURE_2D, mTexture);
-		gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_MAG_FILTER, GL10.GL_LINEAR);
-		gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_MIN_FILTER, GL10.GL_LINEAR);
+	}
+	
+	void applyCamera(GL10 gl) {
+		final float DIST = 3.0f / MAP_SCALE;
+		
+		GeoPoint gp = mMVPos.getCenter();
+		float centerx = (float)MercatorProjection.longitudeToPixelX(gp.longitude, mMVPos.getZoomLevel()),
+			  centerz = (float)MercatorProjection.latitudeToPixelY(gp.latitude, mMVPos.getZoomLevel());
+		float offsetx = (float)Math.sin(mHeading) * DIST,
+		      offsety = DIST / 2.0f,
+			  offsetz = (float)Math.cos(mHeading) * DIST;
+		GLU.gluLookAt(gl, (centerx + offsetx) * MAP_SCALE, offsety * MAP_SCALE, (centerz + offsetz) * MAP_SCALE,
+				centerx * MAP_SCALE, 0.0f, centerz * MAP_SCALE,
+				(float)Math.sin(mHeading) * -offsety, DIST, (float)Math.cos(mHeading) * -offsety);
 	}
 	
 	public void render(GL10 gl, int width, int height) {
@@ -57,17 +68,19 @@ public class MapsforgeGL {
 		gl.glPushMatrix();
 		gl.glLoadIdentity();
 		float aspect = ((float)width / height);
-		gl.glOrthof(0.0f, aspect, 1.0f, 0.0f, -1.0f, 1.0f);
-		//gl.glFrustumf(-1.0f * aspect, 1.0f * aspect, -1.0f, 1.0f, 0.1f, 10.0f);
+		GLU.gluPerspective(gl, 45.0f, aspect, 1.0f, 100.0f);
 		
 		// Render the map
-		gl.glEnable(GL10.GL_TEXTURE_2D);
+		gl.glDisable(GL10.GL_TEXTURE_2D);
 		gl.glMatrixMode(GL10.GL_MODELVIEW);
-		
+		gl.glLoadIdentity();
+		//GLU.gluLookAt(gl, 0.0f, 1.0f, 6.0f, 0.0f, 0.0f, 0.0f, 0.0f, 6.0f, -1.0f);
 		GeoPoint gp = mMVPos.getCenter();
-		TileFrustum tf = new TileFrustum((float)gp.latitude, (float)gp.longitude, mHeading, 90.0f, 16);
-		ArrayList<Tile> visible = tf.getVisibleTiles();
 		
+		TileFrustum tf = new TileFrustum((float)gp.latitude, (float)gp.longitude, mHeading, 90.0f, mMVPos.getZoomLevel());
+		HashSet<Tile> visible = tf.getVisibleTiles();
+		
+		d.resetMatrices(gl);
 		for (Tile tile : visible) {
 			renderTile(gl, tile);
 		}
@@ -82,14 +95,41 @@ public class MapsforgeGL {
 	}
 	
 	private void renderTile(GL10 gl, Tile tile) {
-		Bitmap bitmap = mMV.getTileBitmap(tile);
-		if (bitmap == null) return;
 		double lat = MercatorProjection.tileYToLatitude(tile.tileY, tile.zoomLevel),
 			   lng = MercatorProjection.tileXToLongitude(tile.tileX, tile.zoomLevel);
-		GeoPoint gp = mMVPos.getCenter();
+		float pz = (float)MercatorProjection.latitudeToPixelY(lat, tile.zoomLevel),
+				px = (float)MercatorProjection.longitudeToPixelX(lng, tile.zoomLevel);
+
+		GLTexture tex = mTextureCache.get(tile);
+		if (tex == null) {
+			// Try to load the texture from the rendered Bitmap
+			Bitmap bitmap = mMV.getTileBitmap(tile);
+			if (bitmap != null) {
+				tex = new GLTexture(gl, bitmap);
+				mTextureCache.put(tile, tex);
+			}
+		}
 		
-		gl.glBindTexture(GL10.GL_TEXTURE_2D, mTexture);
-		GLUtils.texImage2D(GL10.GL_TEXTURE_2D, 0, bitmap, 0);
-		d.drawRect(gl, 0.5f - (float)(gp.longitude - lng), 0.25f - (float)(gp.latitude - lat), 0.5f, 0.5f);
+		if (tex != null) {
+			gl.glEnable(GL10.GL_TEXTURE_2D);
+			tex.bind();
+		}
+		else {
+			gl.glDisable(GL10.GL_TEXTURE_2D);
+		}
+		
+		//d.drawRect(gl, px, py, Tile.TILE_SIZE, Tile.TILE_SIZE);
+		//d.drawRect(gl, 0.0f, 0.0f, 1.0f, 1.0f);
+		gl.glLoadIdentity();
+		GeoPoint gp = mMVPos.getCenter();
+		float centerx = (float)MercatorProjection.longitudeToPixelX(gp.longitude, mMVPos.getZoomLevel()),
+				  centerz = (float)MercatorProjection.latitudeToPixelY(gp.latitude, mMVPos.getZoomLevel());
+
+		applyCamera(gl);
+		gl.glScalef(MAP_SCALE, MAP_SCALE, MAP_SCALE);
+		//gl.glTranslatef(px, 0.0f, pz);
+		gl.glTranslatef(px, 0.0f, pz);
+		gl.glScalef(Tile.TILE_SIZE, 1.0f, Tile.TILE_SIZE);
+		d.drawTile(gl);
 	}
 }
